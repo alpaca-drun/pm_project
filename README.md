@@ -29,7 +29,7 @@ OPENAI_API_KEY=OpenAI_API_키
 
 ## ▶️ 서버 실행하기
 ```
-python main.py
+uvicorn main:app --reload
 ```
 ## 📂 프로젝트 구조
 
