@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WebSocket Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.8.2/css/all.min.css"
+    />
+    <style>
+      body {
+        background-color: #fff;
+        margin: 0;
+        padding: 0;
+      }
+      /* 채팅 전체 컨테이너 */
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        max-width: 400px;
+        margin: 0 auto;
+        overflow: hidden;
+      }
+      /* 상단 헤더 스타일 */
+      .chat-header {
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        min-height: 60px;
+        line-height: 1.2;
+      }
+      .chat-header h6 {
+        font-size: 1.6rem;
+        margin: 12px;
+      }
+      /* 메시지 영역 스타일 */
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        gap: 1.2rem;
+        flex-direction: column;
+      }
+      /* 입력 영역 스타일 */
+      .chat-input {
+        padding: 15px;
+        border-top: 1px solid #ccc;
+      }
+      .chat-input form {
+        display: flex;
+        position: relative;
+      }
+      .chat-input input[type="text"] {
+        flex: 1;
+        padding: 12px 14px;
+        border-radius: 25px;
+        font-size: 1rem;
+        border: 1px solid transparent;
+        outline: none;
+        transition: background-color 0.3s ease, border 0.3s ease;
+      }
+      #messageText:focus {
+        background-color: #fff;
+        border: 1px solid #ccc;
+      }
+      .chat-input button {
+        border: none;
+        border-radius: 12px;
+        background-color: #000000;
+        color: white;
+        cursor: pointer;
+        position: absolute;
+        right: 10px;
+        top: 5px;
+        font-size: 1.2rem;
+        padding: 6px 8px;
+      }
+      img {
+        width: 49px;
+        height: 52px;
+        border-radius: 50%;
+      }
+      /* 내가 보낸 메시지 스타일 */
+      .sent-box {
+        align-self: flex-end;
+        display: flex;
+        flex-direction: row-reverse;
+        gap: 1rem;
+        align-items: center;
+        max-width: 80%;
+      }
+      .sent {
+        background-color: #0522c7;
+        color: #fff;
+        text-align: left;
+        padding: 1rem 2rem;
+        border-radius: 60px;
+        font-size: 0.85rem;
+      }
+      /* 받은 메시지 스타일 */
+      .received-box {
+        align-self: flex-start;
+        display: flex;
+        flex-direction: row-reverse;
+        gap: 1rem;
+        align-items: center;
+        max-width: 80%;
+      }
+      .received {
+        background-color: #f0f0f0;
+        text-align: left;
+        padding: 1rem 2rem;
+        border-radius: 60px;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <h6>챗봇</h6>
+      </div>
+      <div class="chat-messages" id="messages"></div>
+      <div class="chat-input">
+        <form id="chatForm" action="">
+          <input
+            type="text"
+            id="messageText"
+            autocomplete="off"
+            placeholder="메시지를 입력해주세요!"
+          />
+          <button type="submit"><i class="fas fa-arrow-up"></i></button>
+        </form>
+      </div>
+    </div>
+    <script>
+      const clientId = Date.now();
+
+      const ws = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
+
+      const messagesContainer = document.getElementById("messages");
+
+      const messageInput = document.getElementById("messageText");
+      const chatForm = document.getElementById("chatForm");
+
+      // 현재 스트리밍 중인 GPT 응답 요소와 받은 토큰 버퍼
+      let responseMessage = null;
+      let receivedText = "";
+      // 인삿말 스트리밍 여부 플래그
+      let greetingStreaming = true;
+
+      // 일정 간격마다 receivedText의 한 글자씩 화면에 추가 (100ms)
+      setInterval(() => {
+        if (receivedText && responseMessage) {
+          responseMessage.textContent += receivedText.charAt(0);
+          receivedText = receivedText.substring(1);
+        }
+        // 인삿말 스트리밍 완료 시 입력란 활성화
+        if (greetingStreaming && receivedText === "") {
+          greetingStreaming = false;
+          messageInput.disabled = false;
+        }
+      }, 100);
+
+      // 받은 메시지 박스 생성
+      function createReceivedMessageBox() {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("received-box");
+        responseMessage = document.createElement("div");
+        responseMessage.classList.add("message-text", "received");
+        const avatar = document.createElement("img");
+        avatar.classList.add("avatar");
+        avatar.src = "/static/img/character.webp";
+        wrapper.appendChild(responseMessage);
+        wrapper.appendChild(avatar);
+        messagesContainer.appendChild(wrapper);
+      }
+
+      // 보낸 메시지 박스 생성
+      function createSentMessageBox(text) {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("sent-box");
+        const textDiv = document.createElement("div");
+        textDiv.classList.add("message-text", "sent");
+        textDiv.textContent = text;
+        const avatar = document.createElement("img");
+        avatar.classList.add("avatar");
+        avatar.src = "/static/img/character.webp";
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(textDiv);
+        messagesContainer.appendChild(wrapper);
+      }
+
+      // 페이지 로드 시 인삿말 스트리밍 시작
+      window.onload = () => {
+        messageInput.disabled = true;
+        createReceivedMessageBox();
+        receivedText += "안녕하세요! 챗봇이에요!";
+      };
+
+      // WebSocket 메시지 처리
+      ws.onmessage = (event) => {
+        const messageData = event.data.trim();
+        console.log(messageData);
+
+        // GPT 응답 스트리밍 처리
+        responseMessage = null;
+        messageInput.disabled = true;
+        greetingStreaming = true;
+        createReceivedMessageBox();
+        receivedText += messageData;
+      };
+
+      // 폼 전송 이벤트 처리
+      chatForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (messageInput.disabled) return;
+        
+        // 사용자 메시지 표시
+        const userMessage = messageInput.value;
+        createSentMessageBox(userMessage);
+        
+        // 서버로 메시지 전송
+        ws.send(userMessage);
+        messageInput.value = "";
+      });
+    </script>
+  </body>
+</html>

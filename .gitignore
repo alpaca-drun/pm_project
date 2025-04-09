@@ -1,0 +1,15 @@
+# 환경 변수 파일
+.env
+
+# 벡터 저장소
+vectorstore/
+
+# 파이썬 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상 환경
+venv/
+env/
+ENV/ 
