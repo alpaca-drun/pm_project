@@ -139,34 +139,32 @@
     </div>
     <script>
       const clientId = Date.now();
-
+    
       const ws = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
-
+    
       const messagesContainer = document.getElementById("messages");
-
+    
       const messageInput = document.getElementById("messageText");
       const chatForm = document.getElementById("chatForm");
-
-      // 현재 스트리밍 중인 GPT 응답 요소와 받은 토큰 버퍼
+    
       let responseMessage = null;
       let receivedText = "";
-      // 인삿말 스트리밍 여부 플래그
-      let greetingStreaming = true;
-
-      // 일정 간격마다 receivedText의 한 글자씩 화면에 추가 (100ms)
+      let greetingStreaming = false;
+      let greetingFinished = false;
+    
+      // ✅ 인사말 한 글자씩 출력 + 끝났는지 체크
       setInterval(() => {
         if (receivedText && responseMessage) {
           responseMessage.textContent += receivedText.charAt(0);
           receivedText = receivedText.substring(1);
-        }
-        // 인삿말 스트리밍 완료 시 입력란 활성화
-        if (greetingStreaming && receivedText === "") {
-          greetingStreaming = false;
-          messageInput.disabled = false;
+    
+          if (greetingStreaming && receivedText.length === 0 && !greetingFinished) {
+            greetingFinished = true;
+            messageInput.disabled = false; // 🔓 입력 가능하게 변경
+          }
         }
       }, 100);
-
-      // 받은 메시지 박스 생성
+    
       function createReceivedMessageBox() {
         const wrapper = document.createElement("div");
         wrapper.classList.add("received-box");
@@ -179,8 +177,7 @@
         wrapper.appendChild(avatar);
         messagesContainer.appendChild(wrapper);
       }
-
-      // 보낸 메시지 박스 생성
+    
       function createSentMessageBox(text) {
         const wrapper = document.createElement("div");
         wrapper.classList.add("sent-box");
@@ -194,20 +191,18 @@
         wrapper.appendChild(textDiv);
         messagesContainer.appendChild(wrapper);
       }
-
-      // 페이지 로드 시 인삿말 스트리밍 시작
+    
       window.onload = () => {
         messageInput.disabled = true;
+        greetingStreaming = true;
         createReceivedMessageBox();
         receivedText += "안녕하세요! 챗봇이에요!";
       };
-
-      // WebSocket 메시지 처리
+    
       ws.onmessage = (event) => {
         const messageData = event.data.trim();
         console.log(messageData);
-
-        // 사용자가 보낸 메시지
+    
         if (messageData.startsWith("You wrote:")) {
           responseMessage = null;
           messageInput.disabled = true;
@@ -215,17 +210,16 @@
           const userText = messageData.replace("You wrote:", "").trim();
           createSentMessageBox(userText);
         } else {
-          // GPT 응답 스트리밍 처리
           if (!responseMessage) {
             messageInput.disabled = true;
             greetingStreaming = true;
+            greetingFinished = false;
             createReceivedMessageBox();
           }
           receivedText += messageData;
         }
       };
-
-      // 폼 전송 이벤트 처리
+    
       chatForm.addEventListener("submit", (event) => {
         event.preventDefault();
         if (messageInput.disabled) return;
@@ -233,5 +227,6 @@
         messageInput.value = "";
       });
     </script>
+    
   </body>
 </html>
